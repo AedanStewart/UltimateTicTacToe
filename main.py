@@ -43,7 +43,7 @@ def pretty_print(board: str):
 
 def annotate_board(board: tuple[int, int], move: int, subboard: int):
     lst_board = list(bitboard_to_str(board).lower())
-    moves = engine.find_moves(board, subboard)
+    moves = engine.find_move_list(board, subboard)
     for i in moves:
         lst_board[i] = "."
     lst_board[move] = lst_board[move].upper()
@@ -97,7 +97,7 @@ def main():
         board = engine.place_token(board, bestmove, token)
 
         pretty_print(annotate_board(board, bestmove, subboard))
-        print(f"\nAll Moves: {engine.find_moves(board, subboard)}")
+        print(f"\nAll Moves: {engine.find_move_list(board, subboard)}")
         print(f"AI Plays: {bestmove}")
 
         if args.output:
@@ -126,20 +126,20 @@ def main():
             AI_up = False
 
         elif args.random_game:
-            nextmove = random.choice(engine.find_moves(board, subboard))
-            print(f"Random {['X', 'O'][token==-1]} plays {nextmove}")
+            nextmove = random.choice(engine.find_move_list(board, subboard))
+            print(f"\nRandom {['X', 'O'][token==-1]} plays {nextmove}")
             AI_up = True
 
         else:
             while True:
-                print(f"\nMoves: {engine.find_moves(board, subboard)}")
+                print(f"\nMoves: {engine.find_move_list(board, subboard)}")
                 nextmove = int(input(f"Player {['X', 'O'][token==-1]}: "))
-                if nextmove not in engine.find_moves(board, subboard):
+                if nextmove not in engine.find_move_list(board, subboard):
                     print("Invalid move, try again")
                 else:
                     break
             AI_up = True
-        
+
         board = engine.place_token(board, nextmove, token)
         current_move = nextmove
         token = -token
