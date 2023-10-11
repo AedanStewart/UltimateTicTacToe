@@ -24,7 +24,7 @@ def bitboard_to_str(board: tuple[int, int]):
         elif engine.get_index(o_board, i):
             board_str += "O"
         else:
-            board_str += "-"
+            board_str += "."
     return board_str
 
 
@@ -42,7 +42,7 @@ def pretty_print(board: str):
 
 
 def annotate_board(board: tuple[int, int], move: int, subboard: int):
-    lst_board = list(bitboard_to_str(board).lower())
+    lst_board = list(bitboard_to_str(board).lower().replace(".", "-"))
     moves = engine.find_move_list(board, subboard)
     for i in moves:
         lst_board[i] = "."
@@ -77,7 +77,7 @@ def parse_args():
         "-s", "--play-self", help="Play the AI against itself", action="store_true"
     )
     parser.add_argument(
-        "-o", "--output", help="Write printed boards to a file", default="", nargs="?"
+        "-o", "--output", help="Write printed boards to a file", default=""
     )
 
     return parser.parse_args()
