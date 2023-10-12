@@ -1,6 +1,5 @@
 import functools
 
-SIZE = 81
 WIN_PATTERNS = [
     0b111000000,
     0b000111000,
@@ -41,44 +40,58 @@ BIT_POSITION_LOOKUP = {1 << (80 - i): i for i in range(81)}
 SUBBOARD_WIN_WEIGHT = 100
 SUBBOARD_NEAR_WIN_WEIGHT = 5
 OVERALL_NEAR_WIN_WEIGHT = 200
+REALLY_BIG_NUMBER = 100_000_000_000
 
 
 def place_index(board: int, index: int):
-    return board | (1 << (SIZE - index - 1))
+    return board | (1 << (80 - index))
 
 
 def get_index(board: int, index: int):
-    return (board & (1 << (SIZE - index - 1))) != 0
+    return (board & (1 << (80 - index))) != 0
 
 
-@functools.lru_cache
-def get_subboard(board: tuple[int, int], subboard: int):
-    x_board, o_board = board
+def get_subboard(board: tuple[int, int, int, int], subboard: int):
+    x_board, o_board, _, _ = board
     return (
-        (x_board >> (SIZE - ((subboard + 1) * 9))) & 0b111111111,
-        (o_board >> (SIZE - ((subboard + 1) * 9))) & 0b111111111,
+        (x_board >> (81 - ((subboard + 1) * 9))) & ((1 << 9) - 1),
+        (o_board >> (81 - ((subboard + 1) * 9))) & ((1 << 9) - 1),
     )
 
 
-def place_token(board: tuple[int, int], index: int, token: int):
+# superfluous function, but it makes main.py marginally easier
+def place_token(board: tuple[int, int, int, int], index: int, token: int):
+    return make_move(board, 1 << (80 - index), token)
+
+
+def make_move(board: tuple[int, int, int, int], move: int, token: int):
+    idx = BIT_POSITION_LOOKUP[move]
+    subboard_idx = idx // 9
+
     if token == 1:
-        return (place_index(board[0], index), board[1])
+        xb, ob, xw, ow = board
+        xb |= move
+        subboard = get_subboard((xb, ob, xw, ow), subboard_idx)
+        xw |= subboard_has_win(subboard[0]) << (8 - subboard_idx)
+        return (xb, ob, xw, ow)
     else:
-        return (board[0], place_index(board[1], index))
+        xb, ob, xw, ow = board
+        ob |= move
+        subboard = get_subboard((xb, ob, xw, ow), subboard_idx)
+        ow |= subboard_has_win(subboard[1]) << (8 - subboard_idx)
+        return (xb, ob, xw, ow)
 
 
-def make_move(board: tuple[int, int], move: int, token: int):
-    if token == 1:
-        return (board[0] | move, board[1])
-    else:
-        return (board[0], board[1] | move)
-
-
-def find_move_list(board: tuple[int, int], subboard: int):
+# this hurts to look at
+def find_move_list(board: tuple[int, int, int, int], subboard: int):
     overall = board[0] | board[1]
     moves = []
     sb = get_subboard(board, subboard)
-    if subboard_has_win(sb[0]) or subboard_has_win(sb[1]) or not ~(sb[0] | sb[1]):
+    if (
+        subboard_has_win(sb[0])
+        or subboard_has_win(sb[1])
+        or (sb[0] | sb[1]) == ((1 << 9) - 1)
+    ):
         for z in range(9):
             sbz = get_subboard(board, z)
             if subboard_has_win(sbz[0]) or subboard_has_win(sbz[1]):
@@ -93,18 +106,19 @@ def find_move_list(board: tuple[int, int], subboard: int):
     return moves
 
 
-def find_moves(board: tuple[int, int], subboard: int):
+def find_moves(board: tuple[int, int, int, int], subboard: int):
     bitmask = 0
+    won_boards = board[2] | board[3]
     sb = get_subboard(board, subboard)
-    if subboard_has_win(sb[0]) or subboard_has_win(sb[1]):
+    if (1 << (8 - subboard)) & won_boards or (sb[0] | sb[1]) == ((1 << 9) - 1):
         for i in range(9):
-            sbi = get_subboard(board, i)
-            if subboard_has_win(sbi[0]) or subboard_has_win(sbi[1]):
-                bitmask |= 0b111111111 << (72 - (i * 9))
-        return (1 << 81) - 1 ^ (board[0] | board[1] | bitmask)
-
+            if won_boards & (1 << i):
+                bitmask |= ((1 << 9) - 1) << (i * 9)
     else:
-        return (((1 << 9) - 1) ^ (sb[0] | sb[1])) << (72 - (subboard * 9))
+        for i in range(9):
+            if i != (8 - subboard):
+                bitmask |= ((1 << 9) - 1) << (i * 9)
+    return ((1 << 81) - 1) ^ (board[0] | board[1] | bitmask)
 
 
 @functools.lru_cache
@@ -115,22 +129,16 @@ def subboard_has_win(subboard: int):
     return False
 
 
-@functools.lru_cache
-def check_win(board: tuple[int, int]):
-    overall_wins_x = 0
-    overall_wins_o = 0
-    for i in range(9):
-        x_sb, o_sb = get_subboard(board, i)
-        if subboard_has_win(x_sb):
-            overall_wins_x = overall_wins_x | (1 << (8 - i))
-        elif subboard_has_win(o_sb):
-            overall_wins_o = overall_wins_o | (1 << (8 - i))
-
-    if subboard_has_win(overall_wins_x):
+def check_win(board: tuple[int, int, int, int]):
+    if subboard_has_win(board[2]):
         return 1
-    elif subboard_has_win(overall_wins_o):
+    elif subboard_has_win(board[3]):
         return -1
     return 0
+
+
+def check_draw(board: tuple[int, int, int, int]):
+    return (board[2] | board[3]) == ((1 << 9) - 1)
 
 
 @functools.lru_cache
@@ -144,11 +152,8 @@ def score_subboard(subboard: int, opponent_subboard: int):
     return score
 
 
-@functools.lru_cache
-def evaluate_board(board: tuple[int, int], token: int):
+def evaluate_board(board: tuple[int, int, int, int], token: int):
     evaluation = 0
-    overall_x = 0
-    overall_o = 0
 
     cw = check_win(board)
     if cw:
@@ -159,30 +164,32 @@ def evaluate_board(board: tuple[int, int], token: int):
         evaluation += score_subboard(x_sb, o_sb) * SUBBOARD_NEAR_WIN_WEIGHT
         evaluation -= score_subboard(o_sb, x_sb) * SUBBOARD_NEAR_WIN_WEIGHT
 
-        if subboard_has_win(x_sb):
+        if board[2] & (1 << (8 - i)):
             evaluation += SUBBOARD_WIN_WEIGHT
-            overall_x = overall_x | (1 << (8 - i))
-        elif subboard_has_win(o_sb):
+        elif board[3] & (1 << (8 - i)):
             evaluation -= SUBBOARD_WIN_WEIGHT
-            overall_o = overall_o | (1 << (8 - i))
 
-    evaluation += score_subboard(overall_x, overall_o) * OVERALL_NEAR_WIN_WEIGHT
-    evaluation -= score_subboard(overall_o, overall_x) * OVERALL_NEAR_WIN_WEIGHT
+    evaluation += score_subboard(board[2], board[3]) * OVERALL_NEAR_WIN_WEIGHT
+    evaluation -= score_subboard(board[3], board[2]) * OVERALL_NEAR_WIN_WEIGHT
 
     return evaluation * token
 
 
-@functools.lru_cache
 def negamax_alphabeta(
-    board: tuple[int, int], subboard: int, token: int, alpha: int, beta: int, depth: int
+    board: tuple[int, int, int, int],
+    subboard: int,
+    token: int,
+    depth: int,
+    alpha: int = -REALLY_BIG_NUMBER,
+    beta: int = REALLY_BIG_NUMBER,
 ):
-    if depth == 0 or check_win(board) != 0:
+    if depth == 0 or check_win(board) or check_draw(board):
         return (evaluate_board(board, token), -1)
 
     moves = find_moves(board, subboard)
     assert moves != 0, "This should have been unreachable, what have I done"
 
-    value = -100_000_000_000
+    value = -REALLY_BIG_NUMBER
     bestmove = -1
     while moves:
         move = ~(moves - 1) & moves
@@ -192,9 +199,9 @@ def negamax_alphabeta(
             make_move(board, move, token),
             BIT_POSITION_LOOKUP[move] % 9,
             -token,
+            depth - 1,
             -beta,
             -alpha,
-            depth - 1,
         )
 
         if -recur_score > value:
@@ -208,5 +215,7 @@ def negamax_alphabeta(
     return (value, bestmove)
 
 
-def find_best_move(board: tuple[int, int], subboard: int, token: int, depth: int):
-    return negamax_alphabeta(board, subboard, token, -100000, 100000, depth)[1]
+def find_best_move(
+    board: tuple[int, int, int, int], subboard: int, token: int, depth: int
+):
+    return negamax_alphabeta(board, subboard, token, depth)[1]
