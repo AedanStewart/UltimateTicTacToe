@@ -121,7 +121,7 @@ def find_moves(board: tuple[int, int, int, int], subboard: int):
     return ((1 << 81) - 1) ^ (board[0] | board[1] | bitmask)
 
 
-@functools.lru_cache
+@functools.lru_cache(maxsize=512)
 def subboard_has_win(subboard: int):
     for pattern in WIN_PATTERNS:
         if (subboard & pattern) == pattern:
@@ -150,7 +150,7 @@ def check_draw(board: tuple[int, int, int, int]):
     return True
 
 
-@functools.lru_cache
+@functools.lru_cache(maxsize=512)
 def score_subboard(subboard: int, opponent_subboard: int):
     score = 0
     for pattern, missingindex in NEAR_WIN_PATTERNS:
@@ -161,6 +161,7 @@ def score_subboard(subboard: int, opponent_subboard: int):
     return score
 
 
+@functools.lru_cache(maxsize=None)
 def evaluate_board(board: tuple[int, int, int, int], token: int):
     evaluation = 0
 
