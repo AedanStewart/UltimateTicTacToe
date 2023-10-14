@@ -138,7 +138,16 @@ def check_win(board: tuple[int, int, int, int]):
 
 
 def check_draw(board: tuple[int, int, int, int]):
-    return (board[2] | board[3]) == ((1 << 9) - 1)
+    overallwins = board[2] | board[3]
+    if overallwins == ((1 << 9) - 1):
+        return True
+    for i in range(9):
+        if overallwins & (1 << (8 - i)):
+            continue
+        sb = get_subboard(board, i)
+        if (sb[0] | sb[1]) != ((1 << 9) - 1):
+            return False
+    return True
 
 
 @functools.lru_cache
@@ -160,14 +169,16 @@ def evaluate_board(board: tuple[int, int, int, int], token: int):
         return token * 100_000_000 * cw
 
     for i in range(9):
+        if board[2] & (1 << (8 - i)):
+            evaluation += SUBBOARD_WIN_WEIGHT
+            continue
+        elif board[3] & (1 << (8 - i)):
+            evaluation -= SUBBOARD_WIN_WEIGHT
+            continue
+
         x_sb, o_sb = get_subboard(board, i)
         evaluation += score_subboard(x_sb, o_sb) * SUBBOARD_NEAR_WIN_WEIGHT
         evaluation -= score_subboard(o_sb, x_sb) * SUBBOARD_NEAR_WIN_WEIGHT
-
-        if board[2] & (1 << (8 - i)):
-            evaluation += SUBBOARD_WIN_WEIGHT
-        elif board[3] & (1 << (8 - i)):
-            evaluation -= SUBBOARD_WIN_WEIGHT
 
     evaluation += score_subboard(board[2], board[3]) * OVERALL_NEAR_WIN_WEIGHT
     evaluation -= score_subboard(board[3], board[2]) * OVERALL_NEAR_WIN_WEIGHT

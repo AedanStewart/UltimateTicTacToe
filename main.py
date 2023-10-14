@@ -1,6 +1,9 @@
 import argparse
 import engine
 import random
+import time
+
+PRINT_STUFF = True
 
 
 def str_to_bitboard(board: str):
@@ -34,13 +37,13 @@ def pretty_print(board: str):
     sub_boards = [board[i : i + 9] for i in range(0, 81, 9)]
     for start in range(0, 9, 3):
         board_group = sub_boards[start : start + 3]
-        print("-" * 25)
+        print_w("-" * 25)
         for row in range(0, 9, 3):
-            print("| ", end="")
+            print_w("| ", end="")
             for board in board_group:
-                print(" ".join(list(board[row : row + 3])), end=" | ")
-            print()
-    print("-" * 25)
+                print_w(" ".join(list(board[row : row + 3])), end=" | ")
+            print_w()
+    print_w("-" * 25)
 
 
 def annotate_board(board: tuple[int, int, int, int], move: int, subboard: int):
@@ -81,18 +84,32 @@ def parse_args():
     parser.add_argument(
         "-o", "--output", help="Write printed boards to a file", default=""
     )
+    parser.add_argument(
+        "-t", "--time", help="Print the total time", action="store_true"
+    )
+    parser.add_argument(
+        "-q", "--disable-print", help="Disable most printing", action="store_true"
+    )
 
     return parser.parse_args()
 
 
+def print_w(*args, **kwargs):
+    if PRINT_STUFF:
+        print(*args, **kwargs)
+
+
 def main():
+    global PRINT_STUFF
+    starttime = time.time()
     args = parse_args()
     board = str_to_bitboard(args.board)
     premove = int(args.premove)
     subboard = premove % 9
     depth = int(args.depth)
-    token = 1 if args.board[int(args.premove)] == "O" else -1
+    token = 1 if args.board.count("X") == args.board.count("O") else -1
     current_move = premove
+    PRINT_STUFF = not args.disable_print
 
     if not (args.play_game or args.random_game or args.play_self):
         bestmove = engine.find_best_move(board, subboard, token, depth)
@@ -100,12 +117,14 @@ def main():
         subboard = bestmove % 9
 
         pretty_print(annotate_board(board, bestmove, subboard))
-        print(f"\nNext Moves: {engine.find_move_list(board, subboard)}")
+        print_w(f"\nNext Moves: {engine.find_move_list(board, subboard)}")
         print(f"AI Plays: {bestmove}")
 
         if args.output:
             with open(args.output, "w") as f:
-                f.write(bitboard_to_str(board))
+                f.write(f"{bitboard_to_str(board)} {current_move} \n")
+        if args.time:
+            print(f"Time: {time.time() - starttime:.4g}s")
         return
 
     if args.output:
@@ -116,29 +135,33 @@ def main():
         pretty_print(annotate_board(board, current_move, subboard))
         if args.output:
             with open(args.output, "a") as f:
-                f.write(bitboard_to_str(board) + "\n")
+                f.write(f"{bitboard_to_str(board)} {current_move} \n")
 
         cw = engine.check_win(board)
         if cw:
             print(f"{['X', 'O'][cw==-1]} wins!")
-            return
+            break
+
+        if engine.check_draw(board):
+            print("Draw!")
+            break
 
         if AI_up or args.play_self:
             nextmove = engine.find_best_move(board, subboard, token, depth)
-            print(f"\nAI {['X', 'O'][token==-1]} Plays: {nextmove}")
+            print_w(f"\nAI {['X', 'O'][token==-1]} Plays: {nextmove}")
             AI_up = False
 
         elif args.random_game:
             nextmove = random.choice(engine.find_move_list(board, subboard))
-            print(f"\nRandom {['X', 'O'][token==-1]} plays {nextmove}")
+            print_w(f"\nRandom {['X', 'O'][token==-1]} plays {nextmove}")
             AI_up = True
 
         else:
             while True:
-                print(f"\nMoves: {engine.find_move_list(board, subboard)}")
+                print_w(f"\nMoves: {engine.find_move_list(board, subboard)}")
                 nextmove = int(input(f"Player {['X', 'O'][token==-1]}: "))
                 if nextmove not in engine.find_move_list(board, subboard):
-                    print("Invalid move, try again")
+                    print_w("Invalid move, try again")
                 else:
                     break
             AI_up = True
@@ -147,6 +170,9 @@ def main():
         current_move = nextmove
         token = -token
         subboard = nextmove % 9
+
+    if args.time:
+        print(f"Time: {time.time() - starttime:.4g}s")
 
 
 if __name__ == "__main__":
