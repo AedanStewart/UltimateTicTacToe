@@ -10,32 +10,6 @@ WIN_PATTERNS = [
     0b100010001,
     0b001010100,
 ]
-NEAR_WIN_PATTERNS = [
-    (0b110000000, 2),
-    (0b101000000, 1),
-    (0b011000000, 0),
-    (0b000110000, 5),
-    (0b000101000, 4),
-    (0b000011000, 3),
-    (0b000000110, 8),
-    (0b000000101, 7),
-    (0b000000011, 6),
-    (0b100100000, 6),
-    (0b100000100, 3),
-    (0b000100100, 0),
-    (0b010010000, 7),
-    (0b010000010, 4),
-    (0b000010010, 1),
-    (0b001001000, 8),
-    (0b001000001, 5),
-    (0b000001001, 2),
-    (0b100010000, 8),
-    (0b100000001, 4),
-    (0b000010001, 0),
-    (0b001010000, 6),
-    (0b001000100, 4),
-    (0b000010100, 2),
-]
 BIT_POSITION_LOOKUP = {1 << (80 - i): i for i in range(81)}
 SUBBOARD_WIN_WEIGHT = 100
 SUBBOARD_NEAR_WIN_WEIGHT = 5
@@ -153,11 +127,13 @@ def check_draw(board: tuple[int, int, int, int]):
 @functools.lru_cache(maxsize=512)
 def score_subboard(subboard: int, opponent_subboard: int):
     score = 0
-    for pattern, missingindex in NEAR_WIN_PATTERNS:
-        if (subboard & pattern) == pattern and opponent_subboard & (
-            1 << 8 - missingindex
-        ) == 0:
+    for pattern in WIN_PATTERNS:
+        x_score = (subboard & pattern).bit_count()
+        o_score = (opponent_subboard & pattern).bit_count()
+        if x_score == 2 and o_score == 0:
             score += 1
+        elif x_score == 0 and o_score == 2:
+            score -= 1
     return score
 
 
@@ -169,20 +145,14 @@ def evaluate_board(board: tuple[int, int, int, int], token: int):
     if cw:
         return token * 100_000_000 * cw
 
-    for i in range(9):
-        if board[2] & (1 << (8 - i)):
-            evaluation += SUBBOARD_WIN_WEIGHT
-            continue
-        elif board[3] & (1 << (8 - i)):
-            evaluation -= SUBBOARD_WIN_WEIGHT
-            continue
+    evaluation += board[2].bit_count() * SUBBOARD_WIN_WEIGHT
+    evaluation -= board[3].bit_count() * SUBBOARD_WIN_WEIGHT
 
+    for i in range(9):
         x_sb, o_sb = get_subboard(board, i)
         evaluation += score_subboard(x_sb, o_sb) * SUBBOARD_NEAR_WIN_WEIGHT
-        evaluation -= score_subboard(o_sb, x_sb) * SUBBOARD_NEAR_WIN_WEIGHT
 
     evaluation += score_subboard(board[2], board[3]) * OVERALL_NEAR_WIN_WEIGHT
-    evaluation -= score_subboard(board[3], board[2]) * OVERALL_NEAR_WIN_WEIGHT
 
     return evaluation * token
 
