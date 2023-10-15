@@ -4,6 +4,7 @@ import random
 import time
 
 PRINT_STUFF = True
+DEPTH = 7
 
 
 def str_to_bitboard(board: str):
@@ -90,6 +91,9 @@ def parse_args():
     parser.add_argument(
         "-q", "--disable-print", help="Disable most printing", action="store_true"
     )
+    parser.add_argument(
+        "-c", "--test", help="Run a certain number of random games and print stats"
+    )
 
     return parser.parse_args()
 
@@ -99,8 +103,41 @@ def print_w(*args, **kwargs):
         print(*args, **kwargs)
 
 
+def run_tests(num_games: int):
+    starttime = time.time()
+    wins = [0, 0, 0]
+    for _ in range(num_games):
+        board = 0, 0, 0, 0
+        lastmove = 40
+        token = 1
+        AI_up = True
+
+        while True:
+            if AI_up:
+                nextmove = engine.find_best_move(board, lastmove % 9, token, DEPTH)
+            else:
+                nextmove = random.choice(engine.find_move_list(board, lastmove % 9))
+
+            board = engine.place_token(board, nextmove, token)
+            lastmove = nextmove
+            token = -token
+            AI_up = not AI_up
+
+            cw = engine.check_win(board)
+            if cw:
+                wins[cw] += 1
+                break
+
+            if engine.check_draw(board):
+                wins[0] += 1
+                break
+    print(f"AI wins: {wins[1]}\nRandom wins: {wins[-1]}\nDraws: {wins[0]}")
+    print(f"Time: {time.time() - starttime:.4g}s")
+
+
+# TODO: make main much less hideous
 def main():
-    global PRINT_STUFF
+    global PRINT_STUFF, DEPTH
     starttime = time.time()
     args = parse_args()
     board = str_to_bitboard(args.board)
@@ -110,8 +147,9 @@ def main():
     token = 1 if args.board.count("X") == args.board.count("O") else -1
     current_move = premove
     PRINT_STUFF = not args.disable_print
+    DEPTH = depth
 
-    if not (args.play_game or args.random_game or args.play_self):
+    if not (args.play_game or args.random_game or args.play_self or args.test):
         bestmove = engine.find_best_move(board, subboard, token, depth)
         board = engine.place_token(board, bestmove, token)
         subboard = bestmove % 9
@@ -125,6 +163,10 @@ def main():
                 f.write(f"{bitboard_to_str(board)} {current_move} \n")
         if args.time:
             print(f"Time: {time.time() - starttime:.4g}s")
+        return
+    
+    if args.test:
+        run_tests(int(args.test))
         return
 
     if args.output:
