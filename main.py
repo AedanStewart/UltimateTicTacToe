@@ -2,6 +2,7 @@ import argparse
 import engine
 import random
 import time
+from tqdm import tqdm
 
 PRINT_STUFF = True
 DEPTH = 7
@@ -106,7 +107,7 @@ def print_w(*args, **kwargs):
 def run_tests(num_games: int):
     starttime = time.time()
     wins = [0, 0, 0]
-    for _ in range(num_games):
+    for _ in tqdm(range(num_games)):
         board = 0, 0, 0, 0
         lastmove = 40
         token = 1
