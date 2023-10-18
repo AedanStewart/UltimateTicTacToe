@@ -157,6 +157,25 @@ def evaluate_board(board: tuple[int, int, int, int], token: int):
     return evaluation * token
 
 
+def order_moves(board: tuple[int, int, int, int], moves: int, token: int, cache: dict):
+    move_list = []
+    while moves:
+        move = ~(moves - 1) & moves
+        moves ^= move
+        tentative_board = make_move(board, move, token)
+
+        if tentative_board in cache:
+            move_list.append((-cache[tentative_board][1], move))
+            continue
+
+        subboard = get_subboard(tentative_board, BIT_POSITION_LOOKUP[move] % 9)
+        value = score_subboard(subboard[0], subboard[1]) * token
+        move_list.append((value, move))
+
+    move_list.sort(key=lambda x: x[0], reverse=True)
+    return [x[1] for x in move_list]
+
+
 def negamax_alphabeta(
     board: tuple[int, int, int, int],
     subboard: int,
@@ -197,7 +216,89 @@ def negamax_alphabeta(
     return (value, bestmove)
 
 
+def negascout(
+    board: tuple[int, int, int, int],
+    subboard: int,
+    token: int,
+    depth: int,
+    cache: dict,
+    alpha: int = -REALLY_BIG_NUMBER,
+    beta: int = REALLY_BIG_NUMBER,
+):
+    if board in cache:
+        ttdepth, ttvalue, ttbestmove = cache[board]
+        if ttdepth >= depth:
+            return (ttvalue, ttbestmove)
+
+    if depth == 0 or check_win(board) or check_draw(board):
+        evaluation = evaluate_board(board, token)
+        cache[board] = (depth, evaluation, -1)
+        return (evaluation, -1)
+
+    moves = find_moves(board, subboard)
+    assert moves != 0, "This should have been unreachable, what have I done"
+
+    move_list = order_moves(board, moves, token, cache)
+
+    value = -REALLY_BIG_NUMBER
+    bestmove = -1
+    for i, move in enumerate(move_list):
+        if i == 0:
+            recur_score, _ = negascout(
+                make_move(board, move, token),
+                BIT_POSITION_LOOKUP[move] % 9,
+                -token,
+                depth - 1,
+                cache,
+                -beta,
+                -alpha,
+            )
+        else:
+            recur_score, _ = negascout(
+                make_move(board, move, token),
+                BIT_POSITION_LOOKUP[move] % 9,
+                -token,
+                depth - 1,
+                cache,
+                -alpha - 1,
+                -alpha,
+            )
+            if alpha < -recur_score < beta:
+                recur_score, _ = negascout(
+                    make_move(board, move, token),
+                    BIT_POSITION_LOOKUP[move] % 9,
+                    -token,
+                    depth - 1,
+                    cache,
+                    -beta,
+                    -alpha,
+                )
+
+        if -recur_score > value:
+            value = -recur_score
+            bestmove = BIT_POSITION_LOOKUP[move]
+
+        alpha = max(alpha, value)
+        if alpha >= beta:
+            break
+
+    cache[board] = (depth, value, bestmove)
+    return (value, bestmove)
+
+
+def iterative_deepening(
+    initial_board: tuple[int, int, int, int], subboard: int, token: int, max_depth: int
+):
+    cache = {}
+    bestmove = -1
+    for d in range(1, max_depth + 1):
+        bestmove = negascout(initial_board, subboard, token, d, cache)[1]
+
+    return bestmove
+
+
 def find_best_move(
     board: tuple[int, int, int, int], subboard: int, token: int, depth: int
 ):
-    return negamax_alphabeta(board, subboard, token, depth)[1]
+    return iterative_deepening(board, subboard, token, depth)
+    # return negamax_alphabeta(board, subboard, token, depth)[1]
