@@ -1,10 +1,12 @@
 import argparse
 import engine
+import rust_engine
 import random
 import time
 from tqdm import tqdm
 
 PRINT_STUFF = True
+USE_RUST = True
 DEPTH = 7
 
 
@@ -95,6 +97,12 @@ def parse_args():
     parser.add_argument(
         "-c", "--test", help="Run a certain number of random games and print stats"
     )
+    parser.add_argument(
+        "-y",
+        "--pure-python",
+        help="Use the pure Python version of the engine",
+        action="store_true",
+    )
 
     return parser.parse_args()
 
@@ -115,7 +123,12 @@ def run_tests(num_games: int):
 
         while True:
             if AI_up:
-                nextmove = engine.find_best_move(board, lastmove % 9, token, DEPTH)
+                if USE_RUST:
+                    nextmove = rust_engine.find_best_move(  # type: ignore
+                        board, lastmove % 9, token, DEPTH
+                    )
+                else:
+                    nextmove = engine.find_best_move(board, lastmove % 9, token, DEPTH)
             else:
                 nextmove = random.choice(engine.find_move_list(board, lastmove % 9))
 
@@ -138,7 +151,7 @@ def run_tests(num_games: int):
 
 # TODO: make main much less hideous
 def main():
-    global PRINT_STUFF, DEPTH
+    global PRINT_STUFF, DEPTH, USE_RUST
     starttime = time.time()
     args = parse_args()
     board = str_to_bitboard(args.board)
@@ -149,9 +162,13 @@ def main():
     current_move = premove
     PRINT_STUFF = not args.disable_print
     DEPTH = depth
+    USE_RUST = not args.pure_python
 
     if not (args.play_game or args.random_game or args.play_self or args.test):
-        bestmove = engine.find_best_move(board, subboard, token, depth)
+        if USE_RUST:
+            bestmove = rust_engine.find_best_move(board, subboard, token, depth)  # type: ignore
+        else:
+            bestmove = engine.find_best_move(board, subboard, token, depth)
         board = engine.place_token(board, bestmove, token)
         subboard = bestmove % 9
 
@@ -165,7 +182,7 @@ def main():
         if args.time:
             print(f"Time: {time.time() - starttime:.4g}s")
         return
-    
+
     if args.test:
         run_tests(int(args.test))
         return
@@ -190,7 +207,10 @@ def main():
             break
 
         if AI_up or args.play_self:
-            nextmove = engine.find_best_move(board, subboard, token, depth)
+            if USE_RUST:
+                nextmove = rust_engine.find_best_move(board, subboard, token, depth)  # type: ignore
+            else:
+                nextmove = engine.find_best_move(board, subboard, token, depth)
             print_w(f"\nAI {['X', 'O'][token==-1]} Plays: {nextmove}")
             AI_up = False
 
