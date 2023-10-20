@@ -56,27 +56,13 @@ def make_move(board: tuple[int, int, int, int], move: int, token: int):
         return (xb, ob, xw, ow)
 
 
-# this hurts to look at
 def find_move_list(board: tuple[int, int, int, int], subboard: int):
-    overall = board[0] | board[1]
+    move_bits = find_moves(board, subboard)
     moves = []
-    sb = get_subboard(board, subboard)
-    if (
-        subboard_has_win(sb[0])
-        or subboard_has_win(sb[1])
-        or (sb[0] | sb[1]) == ((1 << 9) - 1)
-    ):
-        for z in range(9):
-            sbz = get_subboard(board, z)
-            if subboard_has_win(sbz[0]) or subboard_has_win(sbz[1]):
-                continue
-            for i in range(9):
-                if not get_index(overall, z * 9 + i):
-                    moves.append(i + (z * 9))
-    else:
-        for i in range(9):
-            if not get_index(overall, subboard * 9 + i):
-                moves.append(i + (subboard * 9))
+    while move_bits:
+        move = ~(move_bits - 1) & move_bits
+        move_bits ^= move
+        moves.append(BIT_POSITION_LOOKUP[move])
     return moves
 
 
