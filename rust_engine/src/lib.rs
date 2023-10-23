@@ -72,7 +72,7 @@ fn find_moves(board: (u128, u128, u16, u16), subboard: u16) -> u128 {
 }
 
 fn subboard_has_win(subboard: u16) -> bool {
-    for &pattern in WIN_PATTERNS.iter() {
+    for pattern in WIN_PATTERNS {
         if (subboard & pattern) == pattern {
             return true;
         }
@@ -109,7 +109,7 @@ fn check_draw(board: (u128, u128, u16, u16)) -> bool {
 
 fn score_subboard(subboard: u16, opponent_subboard: u16) -> i64 {
     let mut score: i64 = 0;
-    for &pattern in WIN_PATTERNS.iter() {
+    for pattern in WIN_PATTERNS {
         let x_score: i64 = (subboard & pattern).count_ones() as i64;
         let o_score: i64 = (opponent_subboard & pattern).count_ones() as i64;
         if x_score == 2 && o_score == 0 {
@@ -150,6 +150,7 @@ fn order_moves(
 ) -> Vec<u128> {
     let mut move_list_init: Vec<(i64, u128)> = Vec::new();
     let mut all_moves: u128 = moves;
+    move_list_init.reserve_exact(all_moves.count_ones() as usize);
 
     while all_moves != 0 {
         let mv: u128 = !(all_moves - 1) & all_moves;
@@ -168,6 +169,7 @@ fn order_moves(
     }
 
     let mut move_list: Vec<u128> = Vec::new();
+    move_list.reserve_exact(move_list_init.len());
     move_list_init.sort_unstable_by(|a, b| b.0.cmp(&a.0));
     for mv in move_list_init {
         move_list.push(mv.1);
