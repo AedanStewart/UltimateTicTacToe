@@ -8,4 +8,5 @@ name = "rust_engine"
 crate-type = ["cdylib"]
 
 [dependencies]
+hashbrown = "0.14.2"
 pyo3 = { version = "0.20.0", features = ["extension-module"] }

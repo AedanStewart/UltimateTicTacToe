@@ -1,7 +1,7 @@
 extern crate pyo3;
 
 use pyo3::prelude::*;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::vec::Vec;
 
 const WIN_PATTERNS: [u16; 8] = [
